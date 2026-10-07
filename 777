@@ -1,0 +1,1525 @@
+--// AIMBOT + ESP - ROBLOX STUDIO
+--// LocalScript em StarterPlayer > StarterPlayerScripts
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+--------------------------------------------------
+-- CONFIGURAÇÕES
+--------------------------------------------------
+
+local AimbotEnabled = false
+local ESPEnabled = false
+local PanelVisible = true
+local RecordingMode = false
+
+local FOV = 180
+local AimPart = "Head"
+local TeamCheck = false
+local MaxDistance = 1000
+
+local Key = "762"
+
+--------------------------------------------------
+-- GUI
+--------------------------------------------------
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AimESP_777"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Size = UDim2.fromOffset(240, 330)
+Main.Position = UDim2.new(0,20,.5,-165)
+Main.BackgroundColor3 = Color3.fromRGB(20,20,20)
+Main.BorderSizePixel = 0
+Main.Parent = ScreenGui
+
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0,10)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1,0,0,45)
+Title.BackgroundTransparency = 1
+Title.Text = "AIMBOT + ESP"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.TextSize = 20
+Title.Font = Enum.Font.GothamBold
+Title.Parent = Main
+
+local function CreateButton(text, y)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(1,-30,0,40)
+	b.Position = UDim2.new(0,15,0,y)
+	b.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	b.TextColor3 = Color3.new(1,1,1)
+	b.TextSize = 15
+	b.Font = Enum.Font.GothamBold
+	b.Text = text
+	b.Parent = Main
+
+	Instance.new("UICorner",b).CornerRadius = UDim.new(0,7)
+
+	return b
+end
+
+local AimButton = CreateButton("Aimbot: OFF",55)
+local ESPButton = CreateButton("ESP: OFF",100)
+local RecordButton = CreateButton("Modo gravação: OFF",145)
+local HideButton = CreateButton("Esconder painel",190)
+
+--------------------------------------------------
+-- FOV
+--------------------------------------------------
+
+local FOVLabel = Instance.new("TextLabel")
+FOVLabel.Size = UDim2.new(1,-30,0,25)
+FOVLabel.Position = UDim2.new(0,15,0,235)
+FOVLabel.BackgroundTransparency = 1
+FOVLabel.Text = "FOV: "..FOV
+FOVLabel.TextColor3 = Color3.new(1,1,1)
+FOVLabel.TextSize = 15
+FOVLabel.Font = Enum.Font.GothamBold
+FOVLabel.Parent = Main
+
+local FOVBox = Instance.new("TextBox")
+FOVBox.Size = UDim2.new(1,-30,0,35)
+FOVBox.Position = UDim2.new(0,15,0,260)
+FOVBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
+FOVBox.TextColor3 = Color3.new(1,1,1)
+FOVBox.Text = tostring(FOV)
+FOVBox.TextSize = 15
+FOVBox.Font = Enum.Font.GothamBold
+FOVBox.ClearTextOnFocus = false
+FOVBox.Parent = Main
+
+Instance.new("UICorner",FOVBox).CornerRadius = UDim.new(0,7)
+
+FOVBox.FocusLost:Connect(function()
+	local value = tonumber(FOVBox.Text)
+
+	if value then
+		FOV = math.clamp(value,50,500)
+		FOVBox.Text = tostring(FOV)
+		FOVLabel.Text = "FOV: "..FOV
+	end
+end)
+
+--------------------------------------------------
+-- BOTÃO 777
+--------------------------------------------------
+
+local ShowButton = Instance.new("TextButton")
+ShowButton.Name = "777"
+ShowButton.Size = UDim2.fromOffset(120,40)
+ShowButton.Position = UDim2.new(0,20,.5,-20)
+ShowButton.BackgroundColor3 = Color3.fromRGB(25,25,25)
+ShowButton.TextColor3 = Color3.new(1,1,1)
+ShowButton.Text = "777"
+ShowButton.TextSize = 18
+ShowButton.Font = Enum.Font.GothamBold
+ShowButton.Visible = false
+ShowButton.Parent = ScreenGui
+
+Instance.new("UICorner",ShowButton).CornerRadius = UDim.new(0,8)
+
+ShowButton.MouseButton1Click:Connect(function()
+	if RecordingMode then return end
+
+	PanelVisible = true
+	Main.Visible = true
+	ShowButton.Visible = false
+end)
+
+--------------------------------------------------
+-- AIMBOT
+--------------------------------------------------
+
+local function IsValidTarget(player)
+	if player == LocalPlayer then
+		return false
+	end
+
+	if TeamCheck and player.Team == LocalPlayer.Team then
+		return false
+	end
+
+	local character = player.Character
+	if not character then
+		return false
+	end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local head = character:FindFirstChild(AimPart)
+
+	if not humanoid or humanoid.Health <= 0 then
+		return false
+	end
+
+	if not head then
+		return false
+	end
+
+	local distance = (Camera.CFrame.Position - head.Position).Magnitude
+
+	if distance > MaxDistance then
+		return false
+	end
+
+	return true
+end
+
+local function GetClosestTarget()
+	local closestPlayer = nil
+	local closestDistance = FOV
+
+	local screenCenter = Vector2.new(
+		Camera.ViewportSize.X / 2,
+		Camera.ViewportSize.Y / 2
+	)
+
+	for _, player in ipairs(Players:GetPlayers()) do
+
+		if IsValidTarget(player) then
+
+			local character = player.Character
+			local head = character:FindFirstChild(AimPart)
+
+			if head then
+
+				local screenPosition, visible =
+					Camera:WorldToViewportPoint(head.Position)
+
+				if visible and screenPosition.Z > 0 then
+
+					local position = Vector2.new(
+						screenPosition.X,
+						screenPosition.Y
+					)
+
+					local distanceFromCenter =
+						(position - screenCenter).Magnitude
+
+					if distanceFromCenter < closestDistance then
+						closestDistance = distanceFromCenter
+						closestPlayer = player
+					end
+				end
+			end
+		end
+	end
+
+	return closestPlayer
+end
+
+--------------------------------------------------
+-- ESP
+--------------------------------------------------
+
+local ESPObjects = {}
+
+local function RemoveESP(player)
+
+	if ESPObjects[player] then
+
+		if ESPObjects[player].Highlight then
+			ESPObjects[player].Highlight:Destroy()
+		end
+
+		ESPObjects[player] = nil
+	end
+end
+
+local function CreateESP(player)
+
+	if player == LocalPlayer then
+		return
+	end
+
+	if ESPObjects[player] then
+		return
+	end
+
+	local character = player.Character
+
+	if not character then
+		return
+	end
+
+	local highlight = Instance.new("Highlight")
+
+	highlight.Name = "ESP_777"
+	highlight.Adornee = character
+	highlight.FillTransparency = 0.65
+	highlight.OutlineTransparency = 0
+	highlight.FillColor = Color3.fromRGB(255,0,0)
+	highlight.OutlineColor = Color3.fromRGB(255,255,255)
+
+	highlight.Parent = character
+
+	ESPObjects[player] = {
+		Highlight = highlight
+	}
+end
+
+local function UpdateESP()
+
+	for _, player in ipairs(Players:GetPlayers()) do
+
+		if player ~= LocalPlayer then
+
+			if ESPEnabled then
+				CreateESP(player)
+			else
+				RemoveESP(player)
+			end
+
+		end
+	end
+end
+
+--------------------------------------------------
+-- BOTÕES AIMBOT
+--------------------------------------------------
+
+AimButton.MouseButton1Click:Connect(function()
+
+	AimbotEnabled = not AimbotEnabled
+
+	if AimbotEnabled then
+		AimButton.Text = "Aimbot: ON"
+		AimButton.BackgroundColor3 =
+			Color3.fromRGB(30,120,60)
+	else
+		AimButton.Text = "Aimbot: OFF"
+		AimButton.BackgroundColor3 =
+			Color3.fromRGB(40,40,40)
+	end
+end)
+
+--------------------------------------------------
+-- BOTÃO ESP
+--------------------------------------------------
+
+ESPButton.MouseButton1Click:Connect(function()
+
+	ESPEnabled = not ESPEnabled
+
+	if ESPEnabled then
+
+		ESPButton.Text = "ESP: ON"
+		ESPButton.BackgroundColor3 =
+			Color3.fromRGB(30,120,60)
+
+		UpdateESP()
+
+	else
+
+		ESPButton.Text = "ESP: OFF"
+		ESPButton.BackgroundColor3 =
+			Color3.fromRGB(40,40,40)
+
+		for player in pairs(ESPObjects) do
+			RemoveESP(player)
+		end
+	end
+end)
+
+--------------------------------------------------
+-- ATUALIZA AIMBOT
+--------------------------------------------------
+
+RunService.RenderStepped:Connect(function()
+
+	if not AimbotEnabled then
+		return
+	end
+
+	local target = GetClosestTarget()
+
+	if target and target.Character then
+
+		local head = target.Character:FindFirstChild(AimPart)
+
+		if head then
+
+			-- Mira somente quando o alvo está dentro do FOV.
+			Camera.CFrame = CFrame.lookAt(
+				Camera.CFrame.Position,
+				head.Position
+			)
+
+		end
+	end
+end)
+
+--------------------------------------------------
+-- NOVOS PLAYERS / RESPAWN
+--------------------------------------------------
+
+Players.PlayerAdded:Connect(function(player)
+
+	player.CharacterAdded:Connect(function()
+
+		task.wait(0.5)
+
+		if ESPEnabled then
+			CreateESP(player)
+		end
+	end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	RemoveESP(player)
+end)
+
+for _, player in ipairs(Players:GetPlayers()) do
+
+	if player ~= LocalPlayer then
+
+		player.CharacterAdded:Connect(function()
+
+			task.wait(0.5)
+
+			if ESPEnabled then
+				CreateESP(player)
+			end
+		end)
+
+	end
+end
+
+--------------------------------------------------
+-- ESCONDER PAINEL
+--------------------------------------------------
+
+HideButton.MouseButton1Click:Connect(function()
+
+	PanelVisible = false
+	Main.Visible = false
+	ShowButton.Visible = true
+end)
+
+--------------------------------------------------
+-- MODO GRAVAÇÃO
+--------------------------------------------------
+
+RecordButton.MouseButton1Click:Connect(function()
+
+	RecordingMode = not RecordingMode
+
+	if RecordingMode then
+
+		RecordButton.Text = "Modo gravação: ON"
+		RecordButton.BackgroundColor3 =
+			Color3.fromRGB(30,120,60)
+
+		Main.Visible = false
+		ShowButton.Visible = false
+
+	else
+
+		RecordButton.Text = "Modo gravação: OFF"
+		RecordButton.BackgroundColor3 =
+			Color3.fromRGB(40,40,40)
+
+		if PanelVisible then
+			Main.Visible = true
+		else
+			ShowButton.Visible = true
+		end
+	end
+end)
+
+--------------------------------------------------
+-- INSERT
+--------------------------------------------------
+
+UserInputService.InputBegan:Connect(function(input, processed)
+
+	if processed then
+		return
+	end
+
+	if input.KeyCode == Enum.KeyCode.Insert
+		and not RecordingMode then
+
+		PanelVisible = not PanelVisible
+
+		Main.Visible = PanelVisible
+		ShowButton.Visible = not PanelVisible
+	end
+end)
+
+--------------------------------------------------
+-- PAINEL MÓVEL
+--------------------------------------------------
+
+local dragging = false
+local dragStart
+local startPosition
+
+Title.InputBegan:Connect(function(input)
+
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+
+		dragging = true
+		dragStart = input.Position
+		startPosition = Main.Position
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+
+	if not dragging then
+		return
+	end
+
+	if input.UserInputType == Enum.UserInputType.MouseMovement
+		or input.UserInputType == Enum.UserInputType.Touch then
+
+		local delta = input.Position - dragStart
+
+		Main.Position = UDim2.new(
+			startPosition.X.Scale,
+			startPosition.X.Offset + delta.X,
+			startPosition.Y.Scale,
+			startPosition.Y.Offset + delta.Y
+		)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+
+		dragging = false
+	end
+end)
+
+--------------------------------------------------
+-- FIM
+----------------------------------------------------// AIMBOT + ESP - ROBLOX STUDIO
+--// LocalScript em StarterPlayer > StarterPlayerScripts
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+--------------------------------------------------
+-- CONFIGURAÇÕES
+--------------------------------------------------
+
+local AimbotEnabled = false
+local ESPEnabled = false
+local PanelVisible = true
+local RecordingMode = false
+
+local FOV = 180
+local AimPart = "Head"
+local TeamCheck = false
+local MaxDistance = 1000
+
+local Key = "762"
+
+--------------------------------------------------
+-- GUI
+--------------------------------------------------
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AimESP_777"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Size = UDim2.fromOffset(240, 330)
+Main.Position = UDim2.new(0,20,.5,-165)
+Main.BackgroundColor3 = Color3.fromRGB(20,20,20)
+Main.BorderSizePixel = 0
+Main.Parent = ScreenGui
+
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0,10)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1,0,0,45)
+Title.BackgroundTransparency = 1
+Title.Text = "AIMBOT + ESP"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.TextSize = 20
+Title.Font = Enum.Font.GothamBold
+Title.Parent = Main
+
+local function CreateButton(text, y)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(1,-30,0,40)
+	b.Position = UDim2.new(0,15,0,y)
+	b.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	b.TextColor3 = Color3.new(1,1,1)
+	b.TextSize = 15
+	b.Font = Enum.Font.GothamBold
+	b.Text = text
+	b.Parent = Main
+
+	Instance.new("UICorner",b).CornerRadius = UDim.new(0,7)
+
+	return b
+end
+
+local AimButton = CreateButton("Aimbot: OFF",55)
+local ESPButton = CreateButton("ESP: OFF",100)
+local RecordButton = CreateButton("Modo gravação: OFF",145)
+local HideButton = CreateButton("Esconder painel",190)
+
+--------------------------------------------------
+-- FOV
+--------------------------------------------------
+
+local FOVLabel = Instance.new("TextLabel")
+FOVLabel.Size = UDim2.new(1,-30,0,25)
+FOVLabel.Position = UDim2.new(0,15,0,235)
+FOVLabel.BackgroundTransparency = 1
+FOVLabel.Text = "FOV: "..FOV
+FOVLabel.TextColor3 = Color3.new(1,1,1)
+FOVLabel.TextSize = 15
+FOVLabel.Font = Enum.Font.GothamBold
+FOVLabel.Parent = Main
+
+local FOVBox = Instance.new("TextBox")
+FOVBox.Size = UDim2.new(1,-30,0,35)
+FOVBox.Position = UDim2.new(0,15,0,260)
+FOVBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
+FOVBox.TextColor3 = Color3.new(1,1,1)
+FOVBox.Text = tostring(FOV)
+FOVBox.TextSize = 15
+FOVBox.Font = Enum.Font.GothamBold
+FOVBox.ClearTextOnFocus = false
+FOVBox.Parent = Main
+
+Instance.new("UICorner",FOVBox).CornerRadius = UDim.new(0,7)
+
+FOVBox.FocusLost:Connect(function()
+	local value = tonumber(FOVBox.Text)
+
+	if value then
+		FOV = math.clamp(value,50,500)
+		FOVBox.Text = tostring(FOV)
+		FOVLabel.Text = "FOV: "..FOV
+	end
+end)
+
+--------------------------------------------------
+-- BOTÃO 777
+--------------------------------------------------
+
+local ShowButton = Instance.new("TextButton")
+ShowButton.Name = "777"
+ShowButton.Size = UDim2.fromOffset(120,40)
+ShowButton.Position = UDim2.new(0,20,.5,-20)
+ShowButton.BackgroundColor3 = Color3.fromRGB(25,25,25)
+ShowButton.TextColor3 = Color3.new(1,1,1)
+ShowButton.Text = "777"
+ShowButton.TextSize = 18
+ShowButton.Font = Enum.Font.GothamBold
+ShowButton.Visible = false
+ShowButton.Parent = ScreenGui
+
+Instance.new("UICorner",ShowButton).CornerRadius = UDim.new(0,8)
+
+ShowButton.MouseButton1Click:Connect(function()
+	if RecordingMode then return end
+
+	PanelVisible = true
+	Main.Visible = true
+	ShowButton.Visible = false
+end)
+
+--------------------------------------------------
+-- AIMBOT
+--------------------------------------------------
+
+local function IsValidTarget(player)
+	if player == LocalPlayer then
+		return false
+	end
+
+	if TeamCheck and player.Team == LocalPlayer.Team then
+		return false
+	end
+
+	local character = player.Character
+	if not character then
+		return false
+	end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local head = character:FindFirstChild(AimPart)
+
+	if not humanoid or humanoid.Health <= 0 then
+		return false
+	end
+
+	if not head then
+		return false
+	end
+
+	local distance = (Camera.CFrame.Position - head.Position).Magnitude
+
+	if distance > MaxDistance then
+		return false
+	end
+
+	return true
+end
+
+local function GetClosestTarget()
+	local closestPlayer = nil
+	local closestDistance = FOV
+
+	local screenCenter = Vector2.new(
+		Camera.ViewportSize.X / 2,
+		Camera.ViewportSize.Y / 2
+	)
+
+	for _, player in ipairs(Players:GetPlayers()) do
+
+		if IsValidTarget(player) then
+
+			local character = player.Character
+			local head = character:FindFirstChild(AimPart)
+
+			if head then
+
+				local screenPosition, visible =
+					Camera:WorldToViewportPoint(head.Position)
+
+				if visible and screenPosition.Z > 0 then
+
+					local position = Vector2.new(
+						screenPosition.X,
+						screenPosition.Y
+					)
+
+					local distanceFromCenter =
+						(position - screenCenter).Magnitude
+
+					if distanceFromCenter < closestDistance then
+						closestDistance = distanceFromCenter
+						closestPlayer = player
+					end
+				end
+			end
+		end
+	end
+
+	return closestPlayer
+end
+
+--------------------------------------------------
+-- ESP
+--------------------------------------------------
+
+local ESPObjects = {}
+
+local function RemoveESP(player)
+
+	if ESPObjects[player] then
+
+		if ESPObjects[player].Highlight then
+			ESPObjects[player].Highlight:Destroy()
+		end
+
+		ESPObjects[player] = nil
+	end
+end
+
+local function CreateESP(player)
+
+	if player == LocalPlayer then
+		return
+	end
+
+	if ESPObjects[player] then
+		return
+	end
+
+	local character = player.Character
+
+	if not character then
+		return
+	end
+
+	local highlight = Instance.new("Highlight")
+
+	highlight.Name = "ESP_777"
+	highlight.Adornee = character
+	highlight.FillTransparency = 0.65
+	highlight.OutlineTransparency = 0
+	highlight.FillColor = Color3.fromRGB(255,0,0)
+	highlight.OutlineColor = Color3.fromRGB(255,255,255)
+
+	highlight.Parent = character
+
+	ESPObjects[player] = {
+		Highlight = highlight
+	}
+end
+
+local function UpdateESP()
+
+	for _, player in ipairs(Players:GetPlayers()) do
+
+		if player ~= LocalPlayer then
+
+			if ESPEnabled then
+				CreateESP(player)
+			else
+				RemoveESP(player)
+			end
+
+		end
+	end
+end
+
+--------------------------------------------------
+-- BOTÕES AIMBOT
+--------------------------------------------------
+
+AimButton.MouseButton1Click:Connect(function()
+
+	AimbotEnabled = not AimbotEnabled
+
+	if AimbotEnabled then
+		AimButton.Text = "Aimbot: ON"
+		AimButton.BackgroundColor3 =
+			Color3.fromRGB(30,120,60)
+	else
+		AimButton.Text = "Aimbot: OFF"
+		AimButton.BackgroundColor3 =
+			Color3.fromRGB(40,40,40)
+	end
+end)
+
+--------------------------------------------------
+-- BOTÃO ESP
+--------------------------------------------------
+
+ESPButton.MouseButton1Click:Connect(function()
+
+	ESPEnabled = not ESPEnabled
+
+	if ESPEnabled then
+
+		ESPButton.Text = "ESP: ON"
+		ESPButton.BackgroundColor3 =
+			Color3.fromRGB(30,120,60)
+
+		UpdateESP()
+
+	else
+
+		ESPButton.Text = "ESP: OFF"
+		ESPButton.BackgroundColor3 =
+			Color3.fromRGB(40,40,40)
+
+		for player in pairs(ESPObjects) do
+			RemoveESP(player)
+		end
+	end
+end)
+
+--------------------------------------------------
+-- ATUALIZA AIMBOT
+--------------------------------------------------
+
+RunService.RenderStepped:Connect(function()
+
+	if not AimbotEnabled then
+		return
+	end
+
+	local target = GetClosestTarget()
+
+	if target and target.Character then
+
+		local head = target.Character:FindFirstChild(AimPart)
+
+		if head then
+
+			-- Mira somente quando o alvo está dentro do FOV.
+			Camera.CFrame = CFrame.lookAt(
+				Camera.CFrame.Position,
+				head.Position
+			)
+
+		end
+	end
+end)
+
+--------------------------------------------------
+-- NOVOS PLAYERS / RESPAWN
+--------------------------------------------------
+
+Players.PlayerAdded:Connect(function(player)
+
+	player.CharacterAdded:Connect(function()
+
+		task.wait(0.5)
+
+		if ESPEnabled then
+			CreateESP(player)
+		end
+	end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	RemoveESP(player)
+end)
+
+for _, player in ipairs(Players:GetPlayers()) do
+
+	if player ~= LocalPlayer then
+
+		player.CharacterAdded:Connect(function()
+
+			task.wait(0.5)
+
+			if ESPEnabled then
+				CreateESP(player)
+			end
+		end)
+
+	end
+end
+
+--------------------------------------------------
+-- ESCONDER PAINEL
+--------------------------------------------------
+
+HideButton.MouseButton1Click:Connect(function()
+
+	PanelVisible = false
+	Main.Visible = false
+	ShowButton.Visible = true
+end)
+
+--------------------------------------------------
+-- MODO GRAVAÇÃO
+--------------------------------------------------
+
+RecordButton.MouseButton1Click:Connect(function()
+
+	RecordingMode = not RecordingMode
+
+	if RecordingMode then
+
+		RecordButton.Text = "Modo gravação: ON"
+		RecordButton.BackgroundColor3 =
+			Color3.fromRGB(30,120,60)
+
+		Main.Visible = false
+		ShowButton.Visible = false
+
+	else
+
+		RecordButton.Text = "Modo gravação: OFF"
+		RecordButton.BackgroundColor3 =
+			Color3.fromRGB(40,40,40)
+
+		if PanelVisible then
+			Main.Visible = true
+		else
+			ShowButton.Visible = true
+		end
+	end
+end)
+
+--------------------------------------------------
+-- INSERT
+--------------------------------------------------
+
+UserInputService.InputBegan:Connect(function(input, processed)
+
+	if processed then
+		return
+	end
+
+	if input.KeyCode == Enum.KeyCode.Insert
+		and not RecordingMode then
+
+		PanelVisible = not PanelVisible
+
+		Main.Visible = PanelVisible
+		ShowButton.Visible = not PanelVisible
+	end
+end)
+
+--------------------------------------------------
+-- PAINEL MÓVEL
+--------------------------------------------------
+
+local dragging = false
+local dragStart
+local startPosition
+
+Title.InputBegan:Connect(function(input)
+
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+
+		dragging = true
+		dragStart = input.Position
+		startPosition = Main.Position
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+
+	if not dragging then
+		return
+	end
+
+	if input.UserInputType == Enum.UserInputType.MouseMovement
+		or input.UserInputType == Enum.UserInputType.Touch then
+
+		local delta = input.Position - dragStart
+
+		Main.Position = UDim2.new(
+			startPosition.X.Scale,
+			startPosition.X.Offset + delta.X,
+			startPosition.Y.Scale,
+			startPosition.Y.Offset + delta.Y
+		)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+
+		dragging = false
+	end
+end)
+
+--------------------------------------------------
+-- FIM
+----------------------------------------------------// AIMBOT + ESP - ROBLOX STUDIO
+--// LocalScript em StarterPlayer > StarterPlayerScripts
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+--------------------------------------------------
+-- CONFIGURAÇÕES
+--------------------------------------------------
+
+local AimbotEnabled = false
+local ESPEnabled = false
+local PanelVisible = true
+local RecordingMode = false
+
+local FOV = 180
+local AimPart = "Head"
+local TeamCheck = false
+local MaxDistance = 1000
+
+local Key = "762"
+
+--------------------------------------------------
+-- GUI
+--------------------------------------------------
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AimESP_777"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local Main = Instance.new("Frame")
+Main.Name = "Main"
+Main.Size = UDim2.fromOffset(240, 330)
+Main.Position = UDim2.new(0,20,.5,-165)
+Main.BackgroundColor3 = Color3.fromRGB(20,20,20)
+Main.BorderSizePixel = 0
+Main.Parent = ScreenGui
+
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0,10)
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1,0,0,45)
+Title.BackgroundTransparency = 1
+Title.Text = "AIMBOT + ESP"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.TextSize = 20
+Title.Font = Enum.Font.GothamBold
+Title.Parent = Main
+
+local function CreateButton(text, y)
+	local b = Instance.new("TextButton")
+	b.Size = UDim2.new(1,-30,0,40)
+	b.Position = UDim2.new(0,15,0,y)
+	b.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	b.TextColor3 = Color3.new(1,1,1)
+	b.TextSize = 15
+	b.Font = Enum.Font.GothamBold
+	b.Text = text
+	b.Parent = Main
+
+	Instance.new("UICorner",b).CornerRadius = UDim.new(0,7)
+
+	return b
+end
+
+local AimButton = CreateButton("Aimbot: OFF",55)
+local ESPButton = CreateButton("ESP: OFF",100)
+local RecordButton = CreateButton("Modo gravação: OFF",145)
+local HideButton = CreateButton("Esconder painel",190)
+
+--------------------------------------------------
+-- FOV
+--------------------------------------------------
+
+local FOVLabel = Instance.new("TextLabel")
+FOVLabel.Size = UDim2.new(1,-30,0,25)
+FOVLabel.Position = UDim2.new(0,15,0,235)
+FOVLabel.BackgroundTransparency = 1
+FOVLabel.Text = "FOV: "..FOV
+FOVLabel.TextColor3 = Color3.new(1,1,1)
+FOVLabel.TextSize = 15
+FOVLabel.Font = Enum.Font.GothamBold
+FOVLabel.Parent = Main
+
+local FOVBox = Instance.new("TextBox")
+FOVBox.Size = UDim2.new(1,-30,0,35)
+FOVBox.Position = UDim2.new(0,15,0,260)
+FOVBox.BackgroundColor3 = Color3.fromRGB(40,40,40)
+FOVBox.TextColor3 = Color3.new(1,1,1)
+FOVBox.Text = tostring(FOV)
+FOVBox.TextSize = 15
+FOVBox.Font = Enum.Font.GothamBold
+FOVBox.ClearTextOnFocus = false
+FOVBox.Parent = Main
+
+Instance.new("UICorner",FOVBox).CornerRadius = UDim.new(0,7)
+
+FOVBox.FocusLost:Connect(function()
+	local value = tonumber(FOVBox.Text)
+
+	if value then
+		FOV = math.clamp(value,50,500)
+		FOVBox.Text = tostring(FOV)
+		FOVLabel.Text = "FOV: "..FOV
+	end
+end)
+
+--------------------------------------------------
+-- BOTÃO 777
+--------------------------------------------------
+
+local ShowButton = Instance.new("TextButton")
+ShowButton.Name = "777"
+ShowButton.Size = UDim2.fromOffset(120,40)
+ShowButton.Position = UDim2.new(0,20,.5,-20)
+ShowButton.BackgroundColor3 = Color3.fromRGB(25,25,25)
+ShowButton.TextColor3 = Color3.new(1,1,1)
+ShowButton.Text = "777"
+ShowButton.TextSize = 18
+ShowButton.Font = Enum.Font.GothamBold
+ShowButton.Visible = false
+ShowButton.Parent = ScreenGui
+
+Instance.new("UICorner",ShowButton).CornerRadius = UDim.new(0,8)
+
+ShowButton.MouseButton1Click:Connect(function()
+	if RecordingMode then return end
+
+	PanelVisible = true
+	Main.Visible = true
+	ShowButton.Visible = false
+end)
+
+--------------------------------------------------
+-- AIMBOT
+--------------------------------------------------
+
+local function IsValidTarget(player)
+	if player == LocalPlayer then
+		return false
+	end
+
+	if TeamCheck and player.Team == LocalPlayer.Team then
+		return false
+	end
+
+	local character = player.Character
+	if not character then
+		return false
+	end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local head = character:FindFirstChild(AimPart)
+
+	if not humanoid or humanoid.Health <= 0 then
+		return false
+	end
+
+	if not head then
+		return false
+	end
+
+	local distance = (Camera.CFrame.Position - head.Position).Magnitude
+
+	if distance > MaxDistance then
+		return false
+	end
+
+	return true
+end
+
+local function GetClosestTarget()
+	local closestPlayer = nil
+	local closestDistance = FOV
+
+	local screenCenter = Vector2.new(
+		Camera.ViewportSize.X / 2,
+		Camera.ViewportSize.Y / 2
+	)
+
+	for _, player in ipairs(Players:GetPlayers()) do
+
+		if IsValidTarget(player) then
+
+			local character = player.Character
+			local head = character:FindFirstChild(AimPart)
+
+			if head then
+
+				local screenPosition, visible =
+					Camera:WorldToViewportPoint(head.Position)
+
+				if visible and screenPosition.Z > 0 then
+
+					local position = Vector2.new(
+						screenPosition.X,
+						screenPosition.Y
+					)
+
+					local distanceFromCenter =
+						(position - screenCenter).Magnitude
+
+					if distanceFromCenter < closestDistance then
+						closestDistance = distanceFromCenter
+						closestPlayer = player
+					end
+				end
+			end
+		end
+	end
+
+	return closestPlayer
+end
+
+--------------------------------------------------
+-- ESP
+--------------------------------------------------
+
+local ESPObjects = {}
+
+local function RemoveESP(player)
+
+	if ESPObjects[player] then
+
+		if ESPObjects[player].Highlight then
+			ESPObjects[player].Highlight:Destroy()
+		end
+
+		ESPObjects[player] = nil
+	end
+end
+
+local function CreateESP(player)
+
+	if player == LocalPlayer then
+		return
+	end
+
+	if ESPObjects[player] then
+		return
+	end
+
+	local character = player.Character
+
+	if not character then
+		return
+	end
+
+	local highlight = Instance.new("Highlight")
+
+	highlight.Name = "ESP_777"
+	highlight.Adornee = character
+	highlight.FillTransparency = 0.65
+	highlight.OutlineTransparency = 0
+	highlight.FillColor = Color3.fromRGB(255,0,0)
+	highlight.OutlineColor = Color3.fromRGB(255,255,255)
+
+	highlight.Parent = character
+
+	ESPObjects[player] = {
+		Highlight = highlight
+	}
+end
+
+local function UpdateESP()
+
+	for _, player in ipairs(Players:GetPlayers()) do
+
+		if player ~= LocalPlayer then
+
+			if ESPEnabled then
+				CreateESP(player)
+			else
+				RemoveESP(player)
+			end
+
+		end
+	end
+end
+
+--------------------------------------------------
+-- BOTÕES AIMBOT
+--------------------------------------------------
+
+AimButton.MouseButton1Click:Connect(function()
+
+	AimbotEnabled = not AimbotEnabled
+
+	if AimbotEnabled then
+		AimButton.Text = "Aimbot: ON"
+		AimButton.BackgroundColor3 =
+			Color3.fromRGB(30,120,60)
+	else
+		AimButton.Text = "Aimbot: OFF"
+		AimButton.BackgroundColor3 =
+			Color3.fromRGB(40,40,40)
+	end
+end)
+
+--------------------------------------------------
+-- BOTÃO ESP
+--------------------------------------------------
+
+ESPButton.MouseButton1Click:Connect(function()
+
+	ESPEnabled = not ESPEnabled
+
+	if ESPEnabled then
+
+		ESPButton.Text = "ESP: ON"
+		ESPButton.BackgroundColor3 =
+			Color3.fromRGB(30,120,60)
+
+		UpdateESP()
+
+	else
+
+		ESPButton.Text = "ESP: OFF"
+		ESPButton.BackgroundColor3 =
+			Color3.fromRGB(40,40,40)
+
+		for player in pairs(ESPObjects) do
+			RemoveESP(player)
+		end
+	end
+end)
+
+--------------------------------------------------
+-- ATUALIZA AIMBOT
+--------------------------------------------------
+
+RunService.RenderStepped:Connect(function()
+
+	if not AimbotEnabled then
+		return
+	end
+
+	local target = GetClosestTarget()
+
+	if target and target.Character then
+
+		local head = target.Character:FindFirstChild(AimPart)
+
+		if head then
+
+			-- Mira somente quando o alvo está dentro do FOV.
+			Camera.CFrame = CFrame.lookAt(
+				Camera.CFrame.Position,
+				head.Position
+			)
+
+		end
+	end
+end)
+
+--------------------------------------------------
+-- NOVOS PLAYERS / RESPAWN
+--------------------------------------------------
+
+Players.PlayerAdded:Connect(function(player)
+
+	player.CharacterAdded:Connect(function()
+
+		task.wait(0.5)
+
+		if ESPEnabled then
+			CreateESP(player)
+		end
+	end)
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	RemoveESP(player)
+end)
+
+for _, player in ipairs(Players:GetPlayers()) do
+
+	if player ~= LocalPlayer then
+
+		player.CharacterAdded:Connect(function()
+
+			task.wait(0.5)
+
+			if ESPEnabled then
+				CreateESP(player)
+			end
+		end)
+
+	end
+end
+
+--------------------------------------------------
+-- ESCONDER PAINEL
+--------------------------------------------------
+
+HideButton.MouseButton1Click:Connect(function()
+
+	PanelVisible = false
+	Main.Visible = false
+	ShowButton.Visible = true
+end)
+
+--------------------------------------------------
+-- MODO GRAVAÇÃO
+--------------------------------------------------
+
+RecordButton.MouseButton1Click:Connect(function()
+
+	RecordingMode = not RecordingMode
+
+	if RecordingMode then
+
+		RecordButton.Text = "Modo gravação: ON"
+		RecordButton.BackgroundColor3 =
+			Color3.fromRGB(30,120,60)
+
+		Main.Visible = false
+		ShowButton.Visible = false
+
+	else
+
+		RecordButton.Text = "Modo gravação: OFF"
+		RecordButton.BackgroundColor3 =
+			Color3.fromRGB(40,40,40)
+
+		if PanelVisible then
+			Main.Visible = true
+		else
+			ShowButton.Visible = true
+		end
+	end
+end)
+
+--------------------------------------------------
+-- INSERT
+--------------------------------------------------
+
+UserInputService.InputBegan:Connect(function(input, processed)
+
+	if processed then
+		return
+	end
+
+	if input.KeyCode == Enum.KeyCode.Insert
+		and not RecordingMode then
+
+		PanelVisible = not PanelVisible
+
+		Main.Visible = PanelVisible
+		ShowButton.Visible = not PanelVisible
+	end
+end)
+
+--------------------------------------------------
+-- PAINEL MÓVEL
+--------------------------------------------------
+
+local dragging = false
+local dragStart
+local startPosition
+
+Title.InputBegan:Connect(function(input)
+
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+
+		dragging = true
+		dragStart = input.Position
+		startPosition = Main.Position
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+
+	if not dragging then
+		return
+	end
+
+	if input.UserInputType == Enum.UserInputType.MouseMovement
+		or input.UserInputType == Enum.UserInputType.Touch then
+
+		local delta = input.Position - dragStart
+
+		Main.Position = UDim2.new(
+			startPosition.X.Scale,
+			startPosition.X.Offset + delta.X,
+			startPosition.Y.Scale,
+			startPosition.Y.Offset + delta.Y
+		)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+
+		dragging = false
+	end
+end)
+
+--------------------------------------------------
+-- FIM
+--------------------------------------------------
